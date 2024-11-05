@@ -26,7 +26,7 @@ Product_ID,Product_Name,Location,Steward,Source,Users,Keywords,PII,Connection
 2463472188,seq_results,local,PHL,BINFX,PHL,sequencing;results;accessions;variants;lineages,No,data/seq_results/results_with_ncbi_run172.csv
 8971627055,seq_results,local,PHL,BINFX,PHL,sequencing;results;accessions;variants;lineages,No,data/seq_results/results_with_ncbi_run172b.csv
 7253259313,seq_report,network_drive,MEP,,Public,report:variants;lineages,No,data/seq_report/SequencingReport_2024-01-30.docx
-9715465027,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-09-30.parquet
-8085881829,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-10-07.parquet
-7394149033,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-10-14.parquet
-3590275606,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-10-21.parquet
+9715465027,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-09-30.qs
+8085881829,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-10-07.qs
+7394149033,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-10-14.qs
+3590275606,genbank,network_drive,DIQA,NCBI,DIQA,ncbi;genbank;lineages;repository;refseq,No,data/genbank/raw_genbank_2024-10-21.qs
