@@ -1,4 +1,4 @@
-# DSTT: Data Catalog Demo
+# DSTT: Data Catalog Demo 
 
 ## This repository serves as a deployable Shiny app which serves a self-contained sequencing data catalogue.
 
