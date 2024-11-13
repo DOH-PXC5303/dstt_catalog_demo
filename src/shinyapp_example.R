@@ -1,7 +1,8 @@
-# import server & ui code
 library(shiny)
 library(DT)
 library(officer)
+library(duckdb)
+library(jsonlite)
 
 # Read the CSV file when the script starts
 metadata <- read.csv(url("https://raw.githubusercontent.com/NW-PaGe/dstt_catalog_demo/refs/heads/main/metadata.csv"))
@@ -123,11 +124,11 @@ ui <- fluidPage(
       textInput("keywords", "Keywords", ""),
       
       # Static text inputs dynamically pulled from metadata.csv for certain columns
-      selectInput("location", "Location", choices = c("All", unique(metadata$Location)), selected = "All"),
-      selectInput("steward", "Steward", choices = c("All", unique(metadata$Steward)), selected = "All"),
-      selectInput("users", "Users", choices = c("All", unique(metadata$Users)), selected = "All"),
-      selectInput("pii", "PII", choices = c("All", unique(metadata$PII)), selected = "All"),
-      selectInput("source", "Source", choices = c("All", unique(metadata$Source)), selected = "All")
+      selectInput("location", "Location", choices = c("All", unique(split_values(metadata$Location, unlist=T))), selected = "All"),
+      selectInput("steward", "Steward", choices = c("All", unique(split_values(metadata$Steward, unlist=T))), selected = "All"),
+      selectInput("users", "Users", choices = c("All", unique(split_values(metadata$Users, unlist=T))), selected = "All"),
+      selectInput("pii", "PII", choices = c("All", unique(split_values(metadata$PII, unlist=T))), selected = "All"),
+      selectInput("source", "Source", choices = c("All", unique(split_values(metadata$Source, unlist=T))), selected = "All")
     ),
     mainPanel(
       h3("Filters Applied:"),
@@ -182,28 +183,28 @@ server <- function(input, output, session) {
     
     # Apply filters based on input values
     if (!is.null(input$product_id) && input$product_id != "") {
-      data <- subset(data, Product_ID == input$product_id)
+      data <- subset(data, grepl(input$product_id, Product_ID, ignore.case = TRUE))
     }
     if (!is.null(input$product_name) && input$product_name != "") {
-      data <- subset(data, Product_Name == input$product_name)
+      data <- subset(data, grepl(input$product_name, Product_Name, ignore.case = TRUE))
     }
     if (input$keywords != "") {
       data <- subset(data, grepl(input$keywords, Keywords, ignore.case = TRUE))
     }
     if (!is.null(input$location) && input$location != "All") {
-      data <- subset(data, Location == input$location)
+      data <- subset(data, sapply(split_values(Location), function(.) input$location %in% .))
     }
     if (!is.null(input$steward) && input$steward != "All") {
-      data <- subset(data, Steward == input$steward)
+      data <- subset(data, sapply(split_values(Steward), function(.) input$steward %in% .))
     }
     if (!is.null(input$users) && input$users != "All") {
-      data <- subset(data, Users == input$users)
+      data <- subset(data, sapply(split_values(Users), function(.) input$users %in% .))
     }
     if (!is.null(input$pii) && input$pii != "All") {
-      data <- subset(data, PII == input$pii)
+      data <- subset(data, sapply(split_values(PII), function(.) input$pii %in% .))
     }
     if (!is.null(input$source) && input$source != "All") {
-      data <- subset(data, Source == input$source)
+      data <- subset(data, sapply(split_values(Source), function(.) input$source %in% .))
     }
     
     return(data)
@@ -289,10 +290,42 @@ server <- function(input, output, session) {
   # Render the data from the selected file
   output$fileDataTable <- renderDT({
     req(selectedFile())  # Ensure there is a selected file
-    if (grepl('.csv', selectedFile())) {
+    if (grepl('\\.csv$', selectedFile())) {
       tryCatch({
-        file_data <- read.csv(url(paste0('https://raw.githubusercontent.com/NW-PaGe/dstt_catalog_demo/refs/heads/main/', selectedFile())))
+        file_url <- paste0('https://raw.githubusercontent.com/NW-PaGe/dstt_catalog_demo/refs/heads/main/', selectedFile())
+        file_data <- read.csv(url(file_url))
+        # Convert dataframe to datatable object
         datatable(file_data, options = list(pageLength = 10, autoWidth = TRUE))
+      }, error = function(e) {
+        datatable(data.frame(Error = paste("Unable to read file:", e$message)),
+                  options = list(pageLength = 1, dom = 't'))
+      })
+    } else if (grepl('\\.parquet$', selectedFile())) {
+      tryCatch({
+        # get file location url
+        file_url <- paste0('https://raw.githubusercontent.com/NW-PaGe/dstt_catalog_demo/refs/heads/main/', selectedFile())
+        # check file size before downloading:
+        api_url <- paste0("https://api.github.com/repos/NW-PaGe/dstt_catalog_demo/contents/", selectedFile()) # Construct the GitHub API URL for the file
+        con <- url(api_url, "rb") # open connection
+        response <- readLines(con) # get response
+        close(con) # close connection
+        json_data <- jsonlite::fromJSON(paste(response, collapse = '')) # parse json response
+        file_size <- as.numeric(json_data$size)/1024  # get size in KB
+        # download parquet if small enough file
+        if (file_size < 100000) { # check if file is under 100 KB before attempting download
+          # Need to download temp file since httpfs extension not usable with Shinylive:
+          temp_file <- tempfile(fileext = ".parquet") # create temp parquet file
+          download.file(file_url, temp_file, mode = "wb")  # write data from file at url to temp file
+          # read parquet
+          con <- dbConnect(duckdb(), ':memory:') # create db in mem
+          file_data <- dbGetQuery(con, glue::glue("SELECT * FROM read_parquet('{temp_file}') LIMIT 10000")) # Read data and limit preview size to 10k rows
+          dbDisconnect(con, shutdown = TRUE) # close in mem db connection
+          # convert dataframe to datatable object
+          datatable(file_data, options = list(pageLength = 10, autoWidth = TRUE))
+        } else {
+          datatable(data.frame(Warning = paste("Unable to read file: File too large. File size (KB):", format(file_size, nsmall=2, big.mark=','))),
+                    options = list(pageLength = 1, dom = 't'))
+        }
       }, error = function(e) {
         datatable(data.frame(Error = paste("Unable to read file:", e$message)),
                   options = list(pageLength = 1, dom = 't'))
@@ -305,11 +338,11 @@ server <- function(input, output, session) {
   # Render docx content
   output$docx_content <- renderUI({
     req(selectedFile())  # Ensure there is a selected file
-    if (grepl('.docx', selectedFile())) {
+    if (grepl('\\.docx$', selectedFile())) {
       tryCatch({
-        url <- paste0('https://raw.githubusercontent.com/NW-PaGe/dstt_catalog_demo/main/', selectedFile())
+        file_url <- paste0('https://raw.githubusercontent.com/NW-PaGe/dstt_catalog_demo/main/', selectedFile())
         temp_file <- tempfile(fileext = ".docx")
-        download.file(url, destfile = temp_file, mode = "wb")
+        download.file(file_url, destfile = temp_file, mode = "wb")
         # Read the .docx file using officer
         doc <- read_docx(temp_file)
         # Convert docx to html element using code from src
