@@ -94,140 +94,17 @@ This is a static website and demo of a data catalog. Search for data objects in 
 
 :::: {.splash-page}
 
-::: {.column-screen-inset}
+:::{.column-screen-inset}
 
-::: column
-```{ojs}
-//| echo: false
+```{shinylive-r}
+#| standalone: true
+#| components: [editor, viewer]
+#| viewerHeight: 600
 
-// Create a checkbox input for selecting products
-viewof select_products = Inputs.checkbox(products, {label: "Select products:", value: products})
- 
+## file: app.R
+# import docx_to_html function
+{{< include "dag_test.R" >}} 
 ```
-
-```{ojs}
-//| echo: false
-
-// Parse the JSON metadata into a JavaScript array of objects
-metadata_js = JSON.parse(metadata_json)
-
-// Function to update parent and child values with intermediate values
-function updateMetadataWithIntermediates(metadata_js, select_products) {
-  // Convert select_products to a Set for faster lookup
-  const selectedSet = new Set(select_products);
-  
-  // Create a map to look up intermediate values
-  const productMap = new Map(metadata_js.map(row => [row.Product_Name, row]));
-
-  return metadata_js.map(row => {
-    const updatedRow = {...row}; // Copy the row to avoid mutating the original
-    if (!selectedSet.has(row.Product_Name)) {
-      // If the product itself is not selected, exclude it from the results
-      return null;
-    }
-    // Update parent if it's not selected
-    if (row.parent && !selectedSet.has(row.parent)) {
-      // Look for the intermediate product to use its parent
-      const intermediateProduct = metadata_js.find(r => r.child === row.Product_Name && selectedSet.has(r.parent));
-      updatedRow.parent = intermediateProduct ? intermediateProduct.parent : null;
-      // Update direct_parent to show indirect linkage
-      updatedRow.direct_parent = false;
-    }
-    // Update child if it's not selected
-    if (row.child && !selectedSet.has(row.child)) {
-      // Look for the intermediate product to use its child
-      const intermediateProduct = metadata_js.find(r => r.parent === row.Product_Name && selectedSet.has(r.child));
-      updatedRow.child = intermediateProduct ? intermediateProduct.child : null;
-      // Update direct_child to show indirect linkage
-      updatedRow.direct_child = false;
-    }
-    return updatedRow;
-  }).filter(row => row !== null); // Remove rows that were excluded
-}
-
-// Apply the update function
-filtered_metadata_js = updateMetadataWithIntermediates(metadata_js, select_products);
-
-```
-
-:::
-
-```{ojs}
-//| echo: false
-
-// Function to generate mermaid syntax based on selected products
-generateMermaidChart = (select_products, metadata_js) => {
-  // Ensure select_products is an array
-  select_products = Array.isArray(select_products) ? select_products : [];
-  
-  if (select_products.length === 0) return "graph TD\n";
-
-  // Collect unique nodes (products) and edges (relationships)
-  let nodes = new Set();
-  let edges = new Set();
-
-  // Add nodes and edges for selected products
-  select_products.forEach(product => {
-    // Add the product itself
-    nodes.add(product);
-
-    // Find related rows
-    let related_rows = metadata_js.filter(row => row.Product_Name === product || row.parent === product || row.child === product);
-
-    related_rows.forEach(row => {
-      if (select_products.includes(row.Product_Name)) {
-        nodes.add(row.Product_Name);
-        if (row.parent && select_products.includes(row.parent)) {
-          nodes.add(row.parent);
-          if (row.direct_parent === true) {
-            edges.add(`${row.parent} --> ${row.Product_Name}`);
-            }
-          if (row.direct_parent === false) {
-            edges.add(`${row.parent} -.-> ${row.Product_Name}`);
-            }
-        }
-        if (row.child && select_products.includes(row.child)) {
-          nodes.add(row.child);
-          if (row.direct_child === true) {
-            edges.add(`${row.Product_Name} --> ${row.child}`);
-            }
-          if (row.direct_child === false) {
-            edges.add(`${row.Product_Name} -.-> ${row.child}`);
-            }
-        }
-      }
-    });
-  });
-
-  // Create the mermaid syntax
-  let mermaidSyntax = "graph TD\n";
-  
-  // Add nodes to the mermaid syntax
-  nodes.forEach(node => {
-    mermaidSyntax += `${node}\n`;
-  });
-
-  // Add edges to the mermaid syntax
-  edges.forEach(edge => {
-    mermaidSyntax += `${edge}\n`;
-  });
-  
-  return mermaidSyntax;
-}
-
-// Generate the mermaid chart based on the selected products
-mermaidChart = generateMermaidChart(select_products, filtered_metadata_js);
-
-```
-
-```{ojs}
-//| echo: false
-
-// Display the mermaid chart
-mermaid`${mermaidChart}`
-
-```
-
 :::
 
 :::{.column-screen-inset}
